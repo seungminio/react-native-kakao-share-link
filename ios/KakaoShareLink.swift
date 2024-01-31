@@ -128,22 +128,26 @@ class KakaoShareLink: NSObject {
     }
 
     private func shareDefaultTemplate(templateObject: [String: Any], callback: @escaping (Bool, Error?) -> Void) {
-        if ShareApi.isKakaoTalkSharingAvailable() == true {
-            ShareApi.shared.shareDefault(templateObject: templateObject) {(linkResult, error) in
-                if let error = error {
-                    callback(false, error)
+        if #available(iOS 13.0, *) {
+            if ShareApi.isKakaoTalkSharingAvailable() == true {
+                ShareApi.shared.shareDefault(templateObject: templateObject) {(linkResult, error) in
+                    if let error = error {
+                        callback(false, error)
+                    }
+                    else {
+                        //do something
+                        guard let linkResult = linkResult else { return }
+                        UIApplication.shared.open(linkResult.url, options: [:], completionHandler: nil)
+                        callback(true, nil)
+                    }
                 }
-                else {
-                    //do something
-                    guard let linkResult = linkResult else { return }
-                    UIApplication.shared.open(linkResult.url, options: [:], completionHandler: nil)
-                    callback(true, nil)
+            } else {
+                if let url = ShareApi.shared.makeDefaultUrl(templateObject: templateObject) {
+                    openLinkWebview(url: url, callback: callback)
                 }
             }
         } else {
-            if let url = ShareApi.shared.makeDefaultUrl(templateObject: templateObject) {
-                openLinkWebview(url: url, callback: callback)
-            }
+            // Fallback on earlier versions
         }
     }
 
@@ -237,28 +241,32 @@ class KakaoShareLink: NSObject {
     func sendCustom(dict:NSDictionary,resolve:@escaping RCTPromiseResolveBlock,reject:@escaping RCTPromiseRejectBlock) -> Void {
         let templateId = Int64(dict["templateId"] as! Int)
         let templateArgs = createExecutionParams(dict: dict, key: "templateArgs")
-        if ShareApi.isKakaoTalkSharingAvailable() == true {
-            ShareApi.shared.shareCustom(templateId: templateId, templateArgs: templateArgs) {(linkResult, error) in
-                if let error = error {
-                    reject("E_Kakao_Link", error.localizedDescription, nil)
-                }
-                else {
-                    //do something
-                    guard let linkResult = linkResult else { return }
-                    UIApplication.shared.open(linkResult.url, options: [:], completionHandler: nil)
-                    resolve(["result": true])
-                }
-            }
-        } else {
-            if let url = ShareApi.shared.makeCustomUrl(templateId: templateId, templateArgs:templateArgs) {
-                openLinkWebview(url: url) {(result, error) in
+        if #available(iOS 13.0, *) {
+            if ShareApi.isKakaoTalkSharingAvailable() == true {
+                ShareApi.shared.shareCustom(templateId: templateId, templateArgs: templateArgs) {(linkResult, error) in
                     if let error = error {
                         reject("E_Kakao_Link", error.localizedDescription, nil)
-                    } else {
+                    }
+                    else {
+                        //do something
+                        guard let linkResult = linkResult else { return }
+                        UIApplication.shared.open(linkResult.url, options: [:], completionHandler: nil)
                         resolve(["result": true])
                     }
                 }
+            } else {
+                if let url = ShareApi.shared.makeCustomUrl(templateId: templateId, templateArgs:templateArgs) {
+                    openLinkWebview(url: url) {(result, error) in
+                        if let error = error {
+                            reject("E_Kakao_Link", error.localizedDescription, nil)
+                        } else {
+                            resolve(["result": true])
+                        }
+                    }
+                }
             }
+        } else {
+            // Fallback on earlier versions
         }
     }
 }
